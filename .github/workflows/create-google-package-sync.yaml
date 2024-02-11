@@ -23,7 +23,21 @@ jobs:
 
             echo "Creating repository for $package"
             gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/com.google.external-dependency-manager
-            gh workflow run upm-sync.yaml -R RageAgainstThePixel/$package
+
+            # Poll for the workflow file to be available
+            for i in {1..10}
+            do
+              echo "Checking if workflow file is available ($i/10)..."
+              if gh workflow view upm-sync.yaml -R RageAgainstThePixel/$package > /dev/null 2>&1
+              then
+                  echo "Workflow file is available, running workflow..."
+                  gh workflow run upm-sync.yaml -R RageAgainstThePixel/$package
+                  break
+              else
+                  echo "Workflow file is not available yet, waiting..."
+                  sleep 5
+              fi
+            done
           done
         env:
           GH_TOKEN: ${{ secrets.CI_TOKEN }}
