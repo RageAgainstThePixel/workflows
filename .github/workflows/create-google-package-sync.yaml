@@ -29,6 +29,7 @@ jobs:
               output=$(gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/google-package-archive-template 2>&1)
               if [[ $output == *"HTTP 5"* ]]
               then
+                echo $output
                 echo "Server error, waiting before retrying..."
                 sleep 10
               else
