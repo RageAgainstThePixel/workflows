@@ -4,12 +4,19 @@ on:
   schedule:
     - cron: '0 0 * * *'
   workflow_dispatch:
+    inputs:
+      create:
+        description: 'Create repositories for all packages found in the archive'
+        required: false
+        default: true
+        type: boolean
 env:
   ARCHIVE: https://developers.google.com/unity/archive
 concurrency: generate-synced-repository
 jobs:
   generate-synced-repository:
     runs-on: ubuntu-latest
+    if: github.event.inputs.create == true
     steps:
       - name: generate synced google package repository
         run: |
@@ -57,6 +64,23 @@ jobs:
                   sleep 10
               fi
             done
+          done
+        env:
+          GH_TOKEN: ${{ secrets.CI_TOKEN }}
+  delete-synced-repository:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.create == false
+    steps:
+      - name: delete repositories found in the archive
+        run: |
+          set -e
+          packages=$(curl -sS https://developers.google.com/unity/archive | grep -o 'com.google[^<]*' | cut -d'/' -f1 | grep -v '^com$' | sort -u)
+          echo $packages
+          for package in $packages; do
+            if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
+              echo "Deleting repository for $package"
+              gh repo delete RageAgainstThePixel/$package --yes
+            fi
           done
         env:
           GH_TOKEN: ${{ secrets.CI_TOKEN }}
