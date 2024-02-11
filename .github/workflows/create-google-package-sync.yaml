@@ -63,8 +63,6 @@ jobs:
               "homepage": "'"$ARCHIVE"'"
             }'
 
-            echo "JSON payload: $json_payload"
-
             curl -s -o /dev/null -w "%{http_code}\n" -X PATCH -H "Authorization: token $GH_TOKEN" \
             -d "$json_payload" \
             https://api.github.com/repos/RageAgainstThePixel/$package
