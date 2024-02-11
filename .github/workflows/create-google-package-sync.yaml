@@ -12,7 +12,7 @@ on:
         type: boolean
 env:
   ARCHIVE: https://developers.google.com/unity/archive
-concurrency: generate-synced-repository
+concurrency: ${{ github.workflow }}
 jobs:
   generate-synced-repository:
     runs-on: ubuntu-latest
