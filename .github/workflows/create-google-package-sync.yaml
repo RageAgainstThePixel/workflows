@@ -59,8 +59,9 @@ jobs:
           packages=$(curl -sS https://developers.google.com/unity/archive | grep -o 'com.google[^<]*' | cut -d'/' -f1 | grep -v '^com$' | sort -u)
           echo $packages
           for package in $packages; do
-            if gh repo view RageAgainstThePixel/$package --yes >/dev/null 2>&1; then
+            if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
               echo "Deleting repository for $package"
+              gh repo delete RageAgainstThePixel/$package --confirm
             fi
           done
         env:
