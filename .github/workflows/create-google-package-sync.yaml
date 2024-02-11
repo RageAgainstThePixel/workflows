@@ -22,7 +22,19 @@ jobs:
             fi
 
             echo "Creating repository for $package"
-            gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/com.google.external-dependency-manager
+            # Retry the operation up to 3 times
+            for attempt in {1..3}
+            do
+              output=$(gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/com.google.external-dependency-manager 2>&1)
+              if [[ $output == *"HTTP 5"* ]]
+              then
+                echo "Server error, waiting before retrying..."
+                sleep 10
+              else
+                echo "Repository created successfully."
+                break
+              fi
+            done
 
             # Poll for the workflow file to be available
             for i in {1..10}
@@ -35,7 +47,7 @@ jobs:
                   break
               else
                   echo "Workflow file is not available yet, waiting..."
-                  sleep 5
+                  sleep 10
               fi
             done
           done
