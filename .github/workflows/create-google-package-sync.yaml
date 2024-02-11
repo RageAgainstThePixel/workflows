@@ -16,7 +16,7 @@ concurrency: ${{ github.workflow }}
 jobs:
   generate-synced-repository:
     runs-on: ubuntu-latest
-    if: github.event.inputs.create == true
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.create == 'true' }}
     steps:
       - name: generate synced google package repository
         run: |
@@ -69,7 +69,7 @@ jobs:
           GH_TOKEN: ${{ secrets.CI_TOKEN }}
   delete-synced-repository:
     runs-on: ubuntu-latest
-    if: github.event.inputs.create == false
+    if: ${{ github.event.inputs.create == 'false' }}
     steps:
       - name: delete repositories found in the archive
         run: |
