@@ -11,58 +11,59 @@ jobs:
   generate-synced-repository:
     runs-on: ubuntu-latest
     steps:
-      # - name: generate synced google package repository
-      #   run: |
-      #     set -e
-      #     packages=$(curl -sS https://developers.google.com/unity/archive | grep -o 'com.google[^<]*' | cut -d'/' -f1 | grep -v '^com$' | sort -u)
-      #     echo $packages
-      #     for package in $packages; do
-      #       if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
-      #         continue
-      #       fi
-
-      #       echo "Creating repository for $package"
-      #       # Retry the operation up to 3 times
-      #       for attempt in {1..3}
-      #       do
-      #         output=$(gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/com.google.external-dependency-manager 2>&1)
-      #         if [[ $output == *"HTTP 5"* ]]
-      #         then
-      #           echo "Server error, waiting before retrying..."
-      #           sleep 10
-      #         else
-      #           echo "Repository created successfully."
-      #           break
-      #         fi
-      #       done
-
-      #       # Poll for the workflow file to be available
-      #       for i in {1..10}
-      #       do
-      #         echo "Checking if workflow file is available ($i/10)..."
-      #         if gh workflow view upm-sync.yaml -R RageAgainstThePixel/$package > /dev/null 2>&1
-      #         then
-      #             echo "Workflow file is available, running workflow..."
-      #             gh workflow run upm-sync.yaml -R RageAgainstThePixel/$package
-      #             break
-      #         else
-      #             echo "Workflow file is not available yet, waiting..."
-      #             sleep 10
-      #         fi
-      #       done
-      #     done
-      #   env:
-      #     GH_TOKEN: ${{ secrets.CI_TOKEN }}
-      - name: delete repositories found in the archive
+      - name: generate synced google package repository
         run: |
           set -e
           packages=$(curl -sS https://developers.google.com/unity/archive | grep -o 'com.google[^<]*' | cut -d'/' -f1 | grep -v '^com$' | sort -u)
           echo $packages
           for package in $packages; do
             if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
-              echo "Deleting repository for $package"
-              gh repo delete RageAgainstThePixel/$package --yes
+              continue
             fi
+
+            echo "Creating repository for $package"
+            # Retry the operation up to 3 times
+            for attempt in {1..3}
+            do
+              output=$(gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/google-package-archive-template 2>&1)
+              if [[ $output == *"HTTP 5"* ]]
+              then
+                echo "Server error, waiting before retrying..."
+                sleep 10
+              else
+                echo "Repository created successfully."
+                break
+              fi
+            done
+
+            # Poll for the workflow file to be available
+            for i in {1..10}
+            do
+              echo "Checking if workflow file is available ($i/10)..."
+              if gh workflow view upm-sync.yaml -R RageAgainstThePixel/$package > /dev/null 2>&1
+              then
+                  echo "Workflow file is available, running workflow..."
+                  gh workflow run upm-sync.yaml -R RageAgainstThePixel/$package
+                  break
+              else
+                  echo "Workflow file is not available yet, waiting..."
+                  sleep 10
+              fi
+            done
           done
         env:
           GH_TOKEN: ${{ secrets.CI_TOKEN }}
+
+      # - name: delete repositories found in the archive
+      #   run: |
+      #     set -e
+      #     packages=$(curl -sS https://developers.google.com/unity/archive | grep -o 'com.google[^<]*' | cut -d'/' -f1 | grep -v '^com$' | sort -u)
+      #     echo $packages
+      #     for package in $packages; do
+      #       if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
+      #         echo "Deleting repository for $package"
+      #         gh repo delete RageAgainstThePixel/$package --yes
+      #       fi
+      #     done
+      #   env:
+      #     GH_TOKEN: ${{ secrets.CI_TOKEN }}
