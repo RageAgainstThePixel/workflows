@@ -23,7 +23,7 @@ jobs:
 
             echo "Creating repository for $package"
             gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/com.google.external-dependency-manager
-            gh workflow run upm-sync -R RageAgainstThePixel/$package
+            gh workflow run upm-sync.yaml -R RageAgainstThePixel/$package
           done
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
