@@ -1,0 +1,29 @@
+name: generate synced google package repository
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+env:
+  ARCHIVE: https://developers.google.com/unity/archive
+concurrency: generate-synced-repository
+jobs:
+  generate-synced-repository:
+    runs-on: ubuntu-latest
+    steps:
+      - name: generate synced google package repository
+        run: |
+          set -e
+          packages=$(curl -sS https://developers.google.com/unity/archive | grep -o 'com.google[^<]*' | cut -d'/' -f1 | grep -v '^com$' | sort -u)
+          echo $packages
+          for package in $packages; do
+            if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
+              continue
+            fi
+
+            echo "Creating repository for $package"
+            gh repo create RageAgainstThePixel/$package --public --template RageAgainstThePixel/com.google.external-dependency-manager
+            gh workflow run upm-sync -R RageAgainstThePixel/$package
+          done
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
