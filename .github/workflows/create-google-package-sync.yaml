@@ -51,18 +51,22 @@ jobs:
               exit 1
             fi
 
-            curl -X PATCH -H "Authorization: token $GH_TOKEN" \
-            -d '{
+            json_payload='{
               "has_issues": false,
               "has_wiki": false,
               "has_projects": false,
               "allow_rebase_merge": false,
               "allow_squash_merge": false,
               "allow_merge_commit": true,
-              "delete_branch_on_merge": true
+              "delete_branch_on_merge": true,
               "description": "Wrapper over original package distribution. This repository replicates the licence terms of his original distribution location. For more information check https://firebase.google.com/terms and https://firebase.google.com/support/release-notes/unity",
-              "homepage": $ARCHIVE
-            }' \
+              "homepage": "'"$ARCHIVE"'"
+            }'
+
+            echo "JSON payload: $json_payload"
+
+            curl -X PATCH -H "Authorization: token $GH_TOKEN" \
+            -d "$json_payload" \
             https://api.github.com/repos/RageAgainstThePixel/$package
 
             # Poll for the workflow file to be available
