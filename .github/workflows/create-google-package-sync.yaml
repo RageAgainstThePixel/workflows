@@ -33,7 +33,7 @@ jobs:
                 echo "Server error, waiting before retrying..."
                 sleep 10
               else
-                echo "Repository created successfully."
+                echo "\033[0;32mRepository created successfully @ https://github.com/RageAgainstThePixel/$package \033[0m"
                 success=true
                 break
               fi
@@ -60,17 +60,3 @@ jobs:
           done
         env:
           GH_TOKEN: ${{ secrets.CI_TOKEN }}
-
-      # - name: delete repositories found in the archive
-      #   run: |
-      #     set -e
-      #     packages=$(curl -sS https://developers.google.com/unity/archive | grep -o 'com.google[^<]*' | cut -d'/' -f1 | grep -v '^com$' | sort -u)
-      #     echo $packages
-      #     for package in $packages; do
-      #       if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
-      #         echo "Deleting repository for $package"
-      #         gh repo delete RageAgainstThePixel/$package --yes
-      #       fi
-      #     done
-      #   env:
-      #     GH_TOKEN: ${{ secrets.CI_TOKEN }}
