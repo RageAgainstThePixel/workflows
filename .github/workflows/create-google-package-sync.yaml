@@ -61,7 +61,7 @@ jobs:
           for package in $packages; do
             if gh repo view RageAgainstThePixel/$package >/dev/null 2>&1; then
               echo "Deleting repository for $package"
-              gh repo delete RageAgainstThePixel/$package -y
+              echo "y" | gh repo delete RageAgainstThePixel/$package
             fi
           done
         env:
