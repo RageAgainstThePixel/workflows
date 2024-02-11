@@ -39,7 +39,7 @@ jobs:
               fi
             done
             if [ "$success" = false ] ; then
-              echo "Failed to create repository after 3 attempts."
+              echo "::error:: Failed to create repository after 3 attempts."
               exit 1
             fi
 
