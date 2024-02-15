@@ -1,3 +1,3 @@
 # workflows
 
-Workflows that act on the whole Organizations repositories
+Common workflows for the whole RageAgainstThePixel organaization.
