@@ -40,7 +40,7 @@ jobs:
       - name: Add Build Pipeline Package
         run: |
           npm install -g openupm-cli
-          openupm add com.utilities.build-pipeline
+          openupm add com.utilities.buildpipeline
         working-directory: ${{ steps.unity-project.outputs.project-path }}
         shell: bash
       - uses: RageAgainstThePixel/unity-action@v2
