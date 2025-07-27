@@ -33,7 +33,7 @@ jobs:
           license: Personal
           username: ${{ secrets.UNITY_USERNAME }}
           password: ${{ secrets.UNITY_PASSWORD }}
-      - uses: RageAgainstThePixel/create-unity-project@development
+      - uses: RageAgainstThePixel/create-unity-project@v1
         id: unity-project
         with:
           project-name: Test Project
