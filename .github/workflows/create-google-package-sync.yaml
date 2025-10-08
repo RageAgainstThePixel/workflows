@@ -17,6 +17,8 @@ jobs:
   generate-synced-repository:
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'schedule' || github.event.inputs.create == 'true' }}
+    permissions:
+      contents: write
     steps:
       - name: generate synced google package repository
         run: |
@@ -87,6 +89,8 @@ jobs:
   delete-synced-repository:
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.create == 'false' }}
+    permissions:
+      contents: write
     steps:
       - name: delete repositories found in the archive
         run: |
