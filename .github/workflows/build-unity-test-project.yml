@@ -28,7 +28,7 @@ jobs:
           version-file: None
           build-targets: ${{ matrix.build-target }}
           unity-version: ${{ matrix.unity-version }}
-      - uses: RageAgainstThePixel/activate-unity-license@v1
+      - uses: RageAgainstThePixel/activate-unity-license@v2
         with:
           license: Personal
           username: ${{ secrets.UNITY_USERNAME }}
