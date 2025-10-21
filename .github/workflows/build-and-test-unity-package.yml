@@ -23,6 +23,13 @@ jobs:
       contents: read
       actions: write
     steps:
+      - name: Free Disk Space
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.unity-version == '6000.2' }}
+        uses: endersonmenezes/free-disk-space@713d134e243b926eba4a5cce0cf608bfd1efb89a # v2.1.1
+        with:
+          remove_android: true
+          remove_dotnet: false
+          remove_tool_cache: false
       - uses: actions/checkout@v5
       - uses: RageAgainstThePixel/unity-setup@v2
         with:
