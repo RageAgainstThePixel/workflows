@@ -50,14 +50,14 @@ jobs:
           openupm add com.utilities.buildpipeline
         working-directory: ${{ steps.unity-project.outputs.project-path }}
         shell: bash
-      - uses: RageAgainstThePixel/unity-action@v3
+      - uses: RageAgainstThePixel/unity-action@v2
         name: ${{ matrix.build-target }}-Validate
         with:
           build-target: ${{ matrix.build-target }}
           project-path: ${{ steps.unity-project.outputs.project-path }}
           log-name: ${{ matrix.build-target }}-Validate
           args: -quit -executeMethod Utilities.Editor.BuildPipeline.UnityPlayerBuildTools.ValidateProject -importTMProEssentialsAsset
-      - uses: RageAgainstThePixel/unity-action@v3
+      - uses: RageAgainstThePixel/unity-action@v2
         name: ${{ matrix.build-target }}-Build
         with:
           build-target: ${{ matrix.build-target }}
