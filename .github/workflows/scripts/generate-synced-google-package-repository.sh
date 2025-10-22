@@ -1,5 +1,5 @@
 #!/bin/bash
-set -e -o pipefail
+set -xe -o pipefail
 # This script generates GitHub repositories for each Google Unity package
 # found on the Google Unity Archive page, using a predefined template repository.
 
@@ -13,20 +13,32 @@ for package in ${packages}; do
 
     echo "Creating repository for ${package}..."
     success=false
-    # Retry the operation up to 3 times
+    # Retry the operation up to 3 times. Use an if/else around the command so 'set -e' doesn't
+    # cause the script to exit on the first non-zero gh exit code. Capture both output and rc
+    # for better diagnostics.
     for attempt in {1..3}
     do
         echo "Attempt $attempt of 3"
-        output=$(gh repo create RageAgainstThePixel/"${package}" --public --template RageAgainstThePixel/google-package-archive-template 2>&1)
-
-        if [[ $output == *"HTTP 5"* ]]; then
-            echo "${output}"
-            echo "Server error, waiting before retrying..."
-            sleep 10
+        if output=$(gh repo create RageAgainstThePixel/"${package}" --public --template RageAgainstThePixel/google-package-archive-template 2>&1); then
+            rc=0
         else
+            rc=$?
+        fi
+
+        echo "gh exit code: ${rc}"
+        if [ $rc -eq 0 ]; then
             echo "Repository created successfully @ https://github.com/RageAgainstThePixel/${package}"
             success=true
             break
+        else
+            # Print the output for debugging. If it looks like a server error, wait then retry.
+            echo "gh output: ${output}"
+            if [[ ${output} == *"HTTP 5"* ]] || [[ ${output} == *"server error"* ]] || [[ ${output} == *"500"* ]]; then
+                echo "Server error detected, waiting before retrying..."
+            else
+                echo "Non-zero exit from gh; will retry in case of transient issue."
+            fi
+            sleep 10
         fi
     done
 
