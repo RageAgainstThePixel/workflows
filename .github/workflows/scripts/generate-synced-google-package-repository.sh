@@ -1,5 +1,5 @@
 #!/bin/bash
-set -xe -o pipefail
+set -e -o pipefail
 # This script generates GitHub repositories for each Google Unity package
 # found on the Google Unity Archive page, using a predefined template repository.
 
