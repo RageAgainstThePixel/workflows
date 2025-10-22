@@ -1,8 +1,7 @@
 name: generate synced google package repository
-
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 0 * * 0' # Weekly: Sunday 00:00 UTC
   workflow_dispatch:
     inputs:
       create:
