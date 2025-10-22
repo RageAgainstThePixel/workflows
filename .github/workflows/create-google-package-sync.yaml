@@ -23,6 +23,8 @@ jobs:
       - uses: actions/checkout@v5
       - name: generate synced google package repository
         run: ./.github/workflows/scripts/generate-synced-google-package-repository.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
   delete-synced-repository:
     runs-on: ubuntu-latest
     if: ${{ github.event.inputs.create == 'false' }}
@@ -32,3 +34,5 @@ jobs:
       - uses: actions/checkout@v5
       - name: delete repositories found in the archive
         run: ./.github/workflows/scripts/delete-synced-google-package-repositories.sh
+        env:
+          GH_TOKEN: ${{ github.token }}
