@@ -20,6 +20,7 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - name: generate synced google package repository
         run: ./.github/workflows/scripts/generate-synced-google-package-repository.sh
   delete-synced-repository:
@@ -28,5 +29,6 @@ jobs:
     permissions:
       contents: write
     steps:
+      - uses: actions/checkout@v5
       - name: delete repositories found in the archive
         run: ./.github/workflows/scripts/delete-synced-google-package-repositories.sh
