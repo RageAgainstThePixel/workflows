@@ -21,7 +21,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      actions: write
     steps:
       - name: Free Disk Space
         if: ${{ matrix.os == 'ubuntu-latest' && matrix.unity-version == '6000.2' }}
