@@ -1,4 +1,4 @@
-name: build
+name: build unity test project
 permissions:
   contents: read
 on:
@@ -31,6 +31,7 @@ jobs:
           remove_tool_cache: false
       - uses: actions/checkout@v5
       - uses: RageAgainstThePixel/unity-setup@v2
+        timeout-minutes: 30
         with:
           version-file: None
           build-targets: ${{ matrix.build-target }}
@@ -59,6 +60,7 @@ jobs:
           args: -quit -executeMethod Utilities.Editor.BuildPipeline.UnityPlayerBuildTools.ValidateProject -importTMProEssentialsAsset
       - uses: RageAgainstThePixel/unity-action@v3
         name: ${{ matrix.build-target }}-Build
+        timeout-minutes: 30
         with:
           build-target: ${{ matrix.build-target }}
           project-path:  ${{ steps.unity-project.outputs.project-path }}
