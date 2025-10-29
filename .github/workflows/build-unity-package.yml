@@ -33,6 +33,7 @@ jobs:
       - uses: RageAgainstThePixel/unity-setup@v2
         timeout-minutes: 30
         with:
+          hub-version: 3.12.0
           unity-version: ${{ matrix.unity-version }}
           build-targets: ${{ matrix.build-target }}
       - uses: RageAgainstThePixel/activate-unity-license@v2
