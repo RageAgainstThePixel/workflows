@@ -54,7 +54,7 @@ jobs:
           log-name: ${{ matrix.build-target }}-Build
           build-target: ${{ matrix.build-target }}
           args: -quit -executeMethod Utilities.Editor.BuildPipeline.UnityPlayerBuildTools.StartCommandLineBuild ${{ matrix.build-args }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v5
         if: success() || failure()
         with:
           compression-level: 0
