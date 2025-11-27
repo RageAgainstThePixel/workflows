@@ -21,7 +21,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
-      actions: write
+      actions: write # Required for uploading test summaries
     steps:
       - name: Free Disk Space
         if: ${{ matrix.os == 'ubuntu-latest' }}
