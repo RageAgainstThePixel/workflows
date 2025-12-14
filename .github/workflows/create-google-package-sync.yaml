@@ -14,23 +14,23 @@ env:
 concurrency: ${{ github.workflow }}
 jobs:
   generate-synced-repository:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     if: ${{ github.event_name == 'schedule' || github.event.inputs.create == 'true' }}
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: generate synced google package repository
         run: ./.github/workflows/scripts/generate-synced-google-package-repository.sh
         env:
           GH_TOKEN: ${{ github.token }}
   delete-synced-repository:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-slim
     if: ${{ github.event.inputs.create == 'false' }}
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: delete repositories found in the archive
         run: ./.github/workflows/scripts/delete-synced-google-package-repositories.sh
         env:
