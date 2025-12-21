@@ -9,6 +9,11 @@ on:
         required: false
         default: true
         type: boolean
+      delete:
+        description: 'Delete all synced package repositories'
+        required: false
+        default: false
+        type: boolean
 env:
   ARCHIVE: https://developers.google.com/unity/archive
 concurrency: ${{ github.workflow }}
@@ -26,7 +31,7 @@ jobs:
           GH_TOKEN: ${{ secrets.CI_TOKEN }}
   delete-synced-repository:
     runs-on: ubuntu-slim
-    if: ${{ github.event.inputs.create == 'false' }}
+    if: ${{ github.event.inputs.delete == 'true' }}
     permissions:
       contents: write
     steps:
