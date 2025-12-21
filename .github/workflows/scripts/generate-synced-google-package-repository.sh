@@ -30,13 +30,13 @@ for package in ${packages}; do
     echo "Configuring repository settings for ${package} with metadata:"
     echo "${json_payload}" | jq .
 
-    token=$(gh auth token)
-    echo "::add-mask::${token}"
-    response_code=$(curl -s -o /dev/null -w "%{http_code}\n" -X PATCH -H "Authorization: token ${token}" -d "${json_payload}" https://api.github.com/repos/RageAgainstThePixel/"${package}")
+    response_code=$(curl -s -o /dev/null -w "%{http_code}\n" -X PATCH -H "Authorization: token ${GH_TOKEN}" -d "${json_payload}" https://api.github.com/repos/RageAgainstThePixel/"${package}")
 
     if [ "${response_code}" -ne 200 ]; then
         echo "Failed to configure repository settings for ${package}. HTTP response code: ${response_code}"
         exit 1
+    else
+        echo "Repository settings configured successfully for ${package}."
     fi
 
     echo "::start-group::Triggering initial sync workflow for ${package}"
