@@ -27,10 +27,19 @@ for package in ${packages}; do
         "homepage": "https://developers.google.com/unity/archive"
     }'
 
+    echo "Configuring repository settings for ${package} with metadata:"
+    echo "${json_payload}" | jq .
+
     token=$(gh auth token)
     echo "::add-mask::${token}"
-    curl -s -o /dev/null -w "%{http_code}\n" -X PATCH -H "Authorization: token ${token}" -d "${json_payload}" https://api.github.com/repos/RageAgainstThePixel/"${package}"
+    response_code=$(curl -s -o /dev/null -w "%{http_code}\n" -X PATCH -H "Authorization: token ${token}" -d "${json_payload}" https://api.github.com/repos/RageAgainstThePixel/"${package}")
 
+    if [ "${response_code}" -ne 200 ]; then
+        echo "Failed to configure repository settings for ${package}. HTTP response code: ${response_code}"
+        exit 1
+    fi
+
+    echo "::start-group::Triggering initial sync workflow for ${package}"
     # Poll for the workflow file to be available
     for i in {1..10}
     do
@@ -45,4 +54,5 @@ for package in ${packages}; do
             sleep 10
         fi
     done
+    echo "::end-group::"
 done
