@@ -28,7 +28,7 @@ jobs:
       - name: generate synced google package repository
         run: ./.github/workflows/scripts/generate-synced-google-package-repository.sh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.CI_TOKEN }}
   delete-synced-repository:
     runs-on: ubuntu-slim
     if: ${{ github.event.inputs.delete == 'true' }}
@@ -39,4 +39,4 @@ jobs:
       - name: delete repositories found in the archive
         run: ./.github/workflows/scripts/delete-synced-google-package-repositories.sh
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.CI_TOKEN }}
