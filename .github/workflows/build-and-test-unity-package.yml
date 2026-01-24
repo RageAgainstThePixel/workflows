@@ -46,11 +46,17 @@ jobs:
           build-target: ${{ matrix.build-target }}
           args: -quit -executeMethod Utilities.Editor.BuildPipeline.UnityPlayerBuildTools.ValidateProject -importTMProEssentialsAsset
       - uses: RageAgainstThePixel/unity-action@v3
-        name: ${{ matrix.build-target }}-Test
+        name: ${{ matrix.build-target }}-EditMode-Tests
         with:
-          log-name: ${{ matrix.build-target }}-Test
+          log-name: ${{ matrix.build-target }}-EditMode-Tests
           build-target: ${{ matrix.build-target }}
-          args: -runTests -testPlatform EditMode -testResults "${{ github.workspace }}/Logs/${{ matrix.build-target }}-results.xml"
+          args: -runTests -testPlatform EditMode -testResults "${{ github.workspace }}/Logs/${{ matrix.build-target }}-EditMode-results.xml"
+      - uses: RageAgainstThePixel/unity-action@v3
+        name: ${{ matrix.build-target }}-PlayMode-Tests
+        with:
+          log-name: ${{ matrix.build-target }}-PlayMode-Tests
+          build-target: ${{ matrix.build-target }}
+          args: -runTests -testPlatform PlayMode -testResults "${{ github.workspace }}/Logs/${{ matrix.build-target }}-PlayMode-results.xml"
       - uses: RageAgainstThePixel/unity-action@v3
         name: ${{ matrix.build-target }}-Build
         timeout-minutes: 30
