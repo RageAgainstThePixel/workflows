@@ -39,7 +39,7 @@ for package in ${packages}; do
         echo "Repository settings configured successfully for ${package}."
     fi
 
-    echo "::start-group::Triggering initial sync workflow for ${package}"
+    echo "::group:: Triggering initial sync workflow for ${package}"
     # Poll for the workflow file to be available
     for i in {1..10}
     do
@@ -54,5 +54,5 @@ for package in ${packages}; do
             sleep 10
         fi
     done
-    echo "::end-group::"
+    echo "::endgroup::"
 done
