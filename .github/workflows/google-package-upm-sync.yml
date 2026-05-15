@@ -12,7 +12,7 @@ jobs:
           fetch-depth: 0
       - name: get version(s)
         id: archive
-        run: ./.github/workflows/google-package-fetch-versions.sh
+        run: ./.github/workflows/scripts/google-package-fetch-versions.sh
   sync:
     needs: setup
     runs-on: ubuntu-slim
@@ -30,4 +30,6 @@ jobs:
           ref: main
           fetch-depth: 0
       - name: sync package@${{ matrix.version }}
-        run: ./.github/workflows/google-package-sync-upm-package.sh
+        run: ./.github/workflows/scripts/google-package-sync-upm-package.sh
+        env:
+          MATRIX_VERSION: ${{ matrix.version }}
