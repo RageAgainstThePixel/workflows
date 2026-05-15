@@ -9,12 +9,17 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
+          fetch-depth: 0
+          path: package
+      - uses: actions/checkout@v6
+        with:
           repository: RageAgainstThePixel/workflows
           ref: main
           path: workflows
       - name: get version(s)
         id: archive
-        run: ./workflows/scripts/google-package-fetch-versions.sh
+        run: ./workflows/.github/workflows/scripts/google-package-fetch-versions.sh
+        working-directory: package
   sync:
     needs: setup
     runs-on: ubuntu-slim
@@ -38,7 +43,7 @@ jobs:
           ref: main
           path: workflows
       - name: sync package@${{ matrix.version }}
-        run: ./workflows/scripts/google-package-sync-upm-package.sh
+        run: ./workflows/.github/workflows/scripts/google-package-sync-upm-package.sh
         working-directory: package
         env:
           MATRIX_VERSION: ${{ matrix.version }}
