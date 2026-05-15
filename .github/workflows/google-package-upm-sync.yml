@@ -18,7 +18,7 @@ jobs:
           path: workflows
       - name: get version(s)
         id: archive
-        run: ./workflows/.github/workflows/scripts/google-package-fetch-versions.sh
+        run: ../workflows/.github/workflows/scripts/google-package-fetch-versions.sh
         working-directory: package
   sync:
     needs: setup
@@ -43,7 +43,7 @@ jobs:
           ref: main
           path: workflows
       - name: sync package@${{ matrix.version }}
-        run: ./workflows/.github/workflows/scripts/google-package-sync-upm-package.sh
+        run: ../workflows/.github/workflows/scripts/google-package-sync-upm-package.sh
         working-directory: package
         env:
           MATRIX_VERSION: ${{ matrix.version }}
