@@ -14,8 +14,6 @@ on:
         required: false
         default: false
         type: boolean
-env:
-  ARCHIVE: https://developers.google.com/unity/archive
 concurrency: ${{ github.workflow }}
 jobs:
   generate-synced-repository:

@@ -1,0 +1,33 @@
+name: upm sync package
+on:
+  workflow_call:
+jobs:
+  setup:
+    runs-on: ubuntu-slim
+    outputs:
+      versions: ${{ steps.archive.outputs.versions }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: get version(s)
+        id: archive
+        run: ./.github/workflows/google-package-fetch-versions.sh
+  sync:
+    needs: setup
+    runs-on: ubuntu-slim
+    permissions:
+      contents: write
+    if: ${{ needs.setup.outputs.versions != '[]' }}
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        version: ${{ fromJson(needs.setup.outputs.versions) }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: sync package@${{ matrix.version }}
+        run: ./.github/workflows/google-package-sync-upm-package.sh
