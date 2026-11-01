@@ -36,6 +36,8 @@ jobs:
         timeout-minutes: 30
         with:
           allow-security-alert: ${{ inputs.allow-security-alert }}
+          # the streams include the beta and alpha, which only have prereleases until they ship
+          channels: f,b,a
           version-file: None
           build-targets: ${{ matrix.build-target }}
           unity-version: ${{ matrix.unity-version }}
