@@ -1,0 +1,11 @@
+# owners whose actions and reusable workflows intentionally float on major tags.
+# the owner match is case sensitive, so list each casing used in `uses:` refs.
+extensions:
+  - addsTo:
+      pack: codeql/actions-all
+      extensible: trustedActionsOwnerDataModel
+    data:
+      - ["RageAgainstThePixel"]
+      - ["rageagainstthepixel"]
+      - ["buildalon"]
+      - ["Buildalon"]
