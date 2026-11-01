@@ -37,6 +37,8 @@ jobs:
         timeout-minutes: 30
         with:
           allow-security-alert: ${{ inputs.allow-security-alert }}
+          # the streams include the beta and alpha, which only have prereleases until they ship
+          channels: f,b,a
           unity-version: ${{ matrix.unity-version }}
           build-targets: ${{ matrix.build-target }}
       - uses: RageAgainstThePixel/activate-unity-license@v3
