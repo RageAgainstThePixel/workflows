@@ -7,11 +7,11 @@ jobs:
     outputs:
       versions: ${{ steps.archive.outputs.versions }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           path: package
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: RageAgainstThePixel/workflows
           ref: main
@@ -32,12 +32,12 @@ jobs:
       matrix:
         version: ${{ fromJson(needs.setup.outputs.versions) }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: main
           fetch-depth: 0
           path: package
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           repository: RageAgainstThePixel/workflows
           ref: main
