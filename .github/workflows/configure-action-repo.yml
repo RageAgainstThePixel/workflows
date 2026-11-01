@@ -1,0 +1,30 @@
+name: configure-action-repo
+on:
+  workflow_call:
+    secrets:
+      token:
+        description: token with admin access to the calling repository
+        required: true
+permissions:
+  contents: read
+jobs:
+  configure:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.token }}
+      REPOSITORY: ${{ github.repository }}
+    steps:
+      - name: check type property
+        id: check
+        run: |
+          type="$(gh api "repos/$REPOSITORY/properties/values" --jq '.[] | select(.property_name == "type") | .value')"
+          echo "configured=$([[ "$type" == "action" ]] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v7
+        if: ${{ steps.check.outputs.configured != 'true' }}
+        with:
+          repository: RageAgainstThePixel/workflows
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: configure repository
+        if: ${{ steps.check.outputs.configured != 'true' }}
+        run: bash scripts/configure-action-repo.sh "$REPOSITORY"

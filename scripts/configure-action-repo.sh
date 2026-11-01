@@ -29,16 +29,22 @@ fi
 
 action_name="$(printf '%s\n' "$action_yaml" | sed -n 's/^name:[[:space:]]*//p' | head -n 1 | tr -d "\r\"'")"
 slug="$(printf '%s' "$action_name" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//')"
-listing="$(mktemp)"
-trap 'rm -f "$listing"' EXIT
-status="$(curl -sS -o "$listing" -w '%{http_code}' "https://github.com/marketplace/actions/$slug")"
 
-if [[ "$status" == "200" ]] && ! grep -qF "$repo@" "$listing"; then
-  echo "Marketplace name '$action_name' is already taken: https://github.com/marketplace/actions/$slug" >&2
-  exit 1
+# repos created from the template keep its action name until they are renamed
+if [[ "$action_name" == "github-action-template" ]]; then
+  echo "::warning::$repo still uses the template action name; rename it in action.yml and check it is unused on the Marketplace"
+else
+  listing="$(mktemp)"
+  trap 'rm -f "$listing"' EXIT
+  status="$(curl -sS -o "$listing" -w '%{http_code}' "https://github.com/marketplace/actions/$slug")"
+
+  if [[ "$status" == "200" ]] && ! grep -qF "$repo@" "$listing"; then
+    echo "Marketplace name '$action_name' is already taken: https://github.com/marketplace/actions/$slug" >&2
+    exit 1
+  fi
+
+  echo "Marketplace name '$action_name' is available"
 fi
-
-echo "Marketplace name '$action_name' is available"
 
 if [[ "$dry_run" == "--dry-run" ]]; then
   echo "dry run: skipping settings for $repo"
