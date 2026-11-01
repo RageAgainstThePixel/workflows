@@ -1,0 +1,58 @@
+name: detect-changes
+# Tells a caller whether a pull request changes anything beyond documentation, so its validation jobs can skip on a
+# docs-only pull request and still report success. Only pull requests can come out docs-only: pushes, schedules and
+# manual runs always get code=true, and so does anything this job can't read, so a doubt runs everything.
+# Docs files: *.md anywhere, docs/**, LICENSE* and .github/ISSUE_TEMPLATE/**.
+on:
+  workflow_call:
+    outputs:
+      code:
+        description: "'true' when the changes need the caller's validation jobs, 'false' for a docs-only pull request"
+        value: ${{ jobs.detect.outputs.code }}
+jobs:
+  detect:
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ steps.detect.outputs.code }}
+    steps:
+      - name: Detect changes
+        id: detect
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          set -uo pipefail
+          code=true
+          if [ "${EVENT_NAME}" = pull_request ] || [ "${EVENT_NAME}" = pull_request_target ]; then
+            # a rename lists its old path too, so moving code into a .md file still counts as code
+            if files="$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/files?per_page=100" --paginate \
+              --jq '.[] | .filename, (.previous_filename // empty)')"; then
+              count="$(printf '%s\n' "${files}" | grep -c . || true)"
+              # the files api stops at 3000, so a list that long may be missing code files
+              if [ "${count}" -gt 0 ] && [ "${count}" -lt 3000 ]; then
+                code=false
+                while IFS= read -r file; do
+                  case "${file}" in
+                    *.md|*.MD|docs/*|LICENSE*|.github/ISSUE_TEMPLATE/*) ;;
+                    *)
+                      code=true
+                      echo "code change: ${file}"
+                      break
+                      ;;
+                  esac
+                done <<< "${files}"
+              fi
+            else
+              echo '::warning::Could not list the pull request files, so validation runs'
+            fi
+          fi
+          echo "code=${code}" >> "${GITHUB_OUTPUT}"
+          if [ "${code}" = false ]; then
+            echo '::notice::Docs-only changes, so validation is skipped'
+          fi
