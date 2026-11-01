@@ -21,7 +21,7 @@ ensure_discord_hook() {
     gh api -X POST "repos/${repo}/hooks" --silent \
         -f name=web -F active=true \
         -f 'events[]=create' \
-        -f "config[url]=${DISCORD_WEBHOOK_URL%/}/github" -f 'config[content_type]=json' -f 'config[insecure_ssl]=0'
+        -f "config[url]=${DISCORD_WEBHOOK_URL%/github}/github" -f 'config[content_type]=json' -f 'config[insecure_ssl]=0'
     echo "Added discord hook to ${repo}."
 }
 
