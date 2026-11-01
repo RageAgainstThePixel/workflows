@@ -77,17 +77,6 @@ EOF
 # org security configuration enables default setup, but only with the default query suite
 gh api -X PATCH "repos/$repo/code-scanning/default-setup" -f state=configured -f query_suite=extended --silent
 
-existing="$(gh api "repos/$repo/hooks" --jq '[.[] | select(.config.url | test("discord.com"))] | length')"
-
-if [[ "$existing" == "0" ]]; then
-  if [[ -z "${DISCORD_WEBHOOK_URL:-}" ]]; then
-    echo "::warning::DISCORD_WEBHOOK_URL is not set, skipping discord hook for $repo"
-  else
-    gh api -X POST "repos/$repo/hooks" --silent \
-      -f name=web -F active=true \
-      -f 'events[]=release' -f 'events[]=star' \
-      -f "config[url]=${DISCORD_WEBHOOK_URL%/github}/github" -f 'config[content_type]=json' -f 'config[insecure_ssl]=0'
-  fi
-fi
+bash "$(dirname "$0")/add-discord-hook.sh" "$repo" release star
 
 echo "Configured $repo"

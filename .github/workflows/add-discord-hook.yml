@@ -1,0 +1,36 @@
+name: add-discord-hook
+on:
+  workflow_call:
+    inputs:
+      events:
+        description: space separated repository events the hook posts
+        required: false
+        type: string
+        default: release star
+    secrets:
+      token:
+        description: token with admin access to the calling repository
+        required: true
+      discord-webhook:
+        description: discord webhook url for release announcements
+        required: false
+permissions:
+  contents: read
+jobs:
+  add-discord-hook:
+    runs-on: ubuntu-slim
+    env:
+      GH_TOKEN: ${{ secrets.token }}
+      REPOSITORY: ${{ github.repository }}
+      EVENTS: ${{ inputs.events }}
+      DISCORD_WEBHOOK_URL: ${{ secrets.discord-webhook }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          sparse-checkout: scripts
+          persist-credentials: false
+      - name: add discord hook
+        # EVENTS is split into one argument per event
+        run: bash scripts/add-discord-hook.sh "$REPOSITORY" $EVENTS

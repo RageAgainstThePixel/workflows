@@ -5,24 +5,7 @@ set -e -o pipefail
 
 # DISCORD_WEBHOOK_URL: discord webhook for tag announcements, added to every package repository missing it
 ensure_discord_hook() {
-    local repo="RageAgainstThePixel/${1}"
-
-    if [ -z "${DISCORD_WEBHOOK_URL}" ]; then
-        echo "DISCORD_WEBHOOK_URL is not set, skipping discord hook for ${repo}."
-        return
-    fi
-
-    existing=$(gh api "repos/${repo}/hooks" --jq '[.[] | select(.config.url | test("discord.com"))] | length')
-
-    if [ "${existing}" != "0" ]; then
-        return
-    fi
-
-    gh api -X POST "repos/${repo}/hooks" --silent \
-        -f name=web -F active=true \
-        -f 'events[]=create' \
-        -f "config[url]=${DISCORD_WEBHOOK_URL%/github}/github" -f 'config[content_type]=json' -f 'config[insecure_ssl]=0'
-    echo "Added discord hook to ${repo}."
+    bash ./scripts/add-discord-hook.sh "RageAgainstThePixel/${1}" create
 }
 
 packages=$(curl -sS https://developers.google.com/unity/archive | grep -oP 'com.google.[a-z.-]*\d+\.\d+\.\d+\.tgz' | sed -r 's/-?[0-9]+\.[0-9]+\.[0-9]+\.tgz//g' | sort -u)
