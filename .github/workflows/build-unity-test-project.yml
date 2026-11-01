@@ -5,6 +5,10 @@ on:
       matrix:
         required: true
         type: string
+      allow-security-alert:
+        description: Install editors that carry a Unity Security Alert, which the monthly legacy run needs
+        type: boolean
+        default: false
     secrets:
       UNITY_USERNAME:
         required: true
@@ -28,9 +32,10 @@ jobs:
           remove_dotnet: false
           remove_tool_cache: false
       - uses: actions/checkout@v7
-      - uses: RageAgainstThePixel/unity-setup@v2
+      - uses: RageAgainstThePixel/unity-setup@v3
         timeout-minutes: 30
         with:
+          allow-security-alert: ${{ inputs.allow-security-alert }}
           version-file: None
           build-targets: ${{ matrix.build-target }}
           unity-version: ${{ matrix.unity-version }}
