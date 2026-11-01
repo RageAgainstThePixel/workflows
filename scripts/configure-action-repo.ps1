@@ -9,7 +9,11 @@
 param(
     [Parameter(Mandatory)]
     [ValidatePattern('^[\w.-]+/[\w.-]+$')]
-    [string]$Repository
+    [string]$Repository,
+
+    # existing action repo whose discord release/star hook is copied, so the url never lives in source control
+    [ValidatePattern('^[\w.-]+/[\w.-]+$')]
+    [string]$DiscordHookSource = 'RageAgainstThePixel/unity-action'
 )
 
 $ErrorActionPreference = 'Stop'
@@ -67,5 +71,23 @@ if ($PSCmdlet.ShouldProcess($Repository, 'apply action repository settings')) {
     # org security configuration enables default setup, but only with the default query suite
     gh api -X PATCH "repos/$Repository/code-scanning/default-setup" -f state=configured -f query_suite=extended --silent
 
+    $discordUrl = gh api "repos/$DiscordHookSource/hooks" --jq '[.[] | select(.config.url | test("discord.com"))][0].config.url'
+
+    if (-not $discordUrl) {
+        throw "$DiscordHookSource has no discord hook to copy"
+    }
+
+    $existing = gh api "repos/$Repository/hooks" --jq '[.[] | select(.config.url | test("discord.com"))] | length'
+
+    if ($existing -eq '0') {
+        @{
+            name   = 'web'
+            active = $true
+            events = @('release', 'star')
+            config = @{ url = $discordUrl; content_type = 'json'; insecure_ssl = '0' }
+        } | ConvertTo-Json -Depth 4 | gh api -X POST "repos/$Repository/hooks" --input - --silent
+    }
+
+    Remove-Variable discordUrl
     Write-Host "Configured $Repository"
 }
