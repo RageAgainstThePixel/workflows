@@ -60,7 +60,7 @@ jobs:
       checks: read # to read the failed jobs' annotations
     steps:
       - name: Rerun marked failures
-        shell: pwsh
+        shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
           RUN_ID: ${{ inputs.run-id }}
@@ -70,65 +70,75 @@ jobs:
           IGNORE_JOBS: ${{ inputs.ignore-jobs }}
           DELAY_SECONDS: ${{ inputs.delay-seconds }}
         run: |
-          $ErrorActionPreference = 'Stop'
-          $repo = $env:GITHUB_REPOSITORY
-          $attempt = [int]$env:RUN_ATTEMPT
-          $markers = $env:MARKERS -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-          $ignore = $env:IGNORE_JOBS -split ',' | ForEach-Object { $_.Trim() } | Where-Object { $_ }
-          function Write-Summary([string]$text) { Add-Content -Path $env:GITHUB_STEP_SUMMARY -Value $text }
+          set -euo pipefail
+          repo="$GITHUB_REPOSITORY"
+          attempt="$RUN_ATTEMPT"
+          to_json_list() { jq -cn --arg s "$1" '$s | split(",") | map(gsub("^\\s+|\\s+$"; "")) | map(select(length > 0))'; }
+          markers="$(to_json_list "$MARKERS")"
+          ignore="$(to_json_list "$IGNORE_JOBS")"
+          summary() { printf '%s\n' "$1" >> "$GITHUB_STEP_SUMMARY"; }
           # the REST API answers 5xx now and then, and always for 100 jobs with their steps in one page, so pages are
           # kept small and a retry with backoff rides out the rest
-          function Invoke-GhApi([string]$path, [string]$jq) {
-            foreach ($try in 1..4) {
-              $out = gh api $path --paginate --jq $jq
-              if ($LASTEXITCODE -eq 0) { return $out }
-              if ($try -lt 4) { Start-Sleep -Seconds ([math]::Pow(2, $try)) }
-            }
-            throw "gh api $path failed after 4 attempts"
+          gh_api() {
+            local out try
+            for try in 1 2 3 4; do
+              if out="$(gh api "$1" --paginate --jq "$2")"; then
+                printf '%s' "$out"
+                return 0
+              fi
+              if [ "$try" -lt 4 ]; then sleep $((2 ** try)); fi
+            done
+            echo "gh api $1 failed after 4 attempts" >&2
+            return 1
           }
 
-          $jobs = Invoke-GhApi "repos/$repo/actions/runs/$($env:RUN_ID)/attempts/$attempt/jobs?per_page=30" '.jobs[]' |
-            ForEach-Object { $_ | ConvertFrom-Json }
-          $failed = @($jobs | Where-Object { $_.conclusion -eq 'failure' -and $ignore -notcontains $_.name })
-          if ($failed.Count -eq 0) {
-            Write-Summary "No failed jobs in run $($env:RUN_ID) attempt $attempt."
+          jobs="$(gh_api "repos/$repo/actions/runs/$RUN_ID/attempts/$attempt/jobs?per_page=30" \
+            '.jobs[] | {id, name, conclusion, steps: (.steps // [] | length), failedSteps: ([.steps // [] | .[] | select(.conclusion == "failure")] | length)} | tojson')"
+          failed="$(printf '%s\n' "$jobs" | jq -c --argjson ignore "$ignore" 'select(.conclusion == "failure" and (.name | IN($ignore[]) | not))')"
+          if [ -z "$failed" ]; then
+            summary "No failed jobs in run $RUN_ID attempt $attempt."
             exit 0
-          }
+          fi
 
-          $marked = @()
-          $unmarked = @()
-          foreach ($job in $failed) {
+          marked=()
+          unmarked=()
+          while IFS= read -r job; do
+            id="$(jq -r '.id' <<< "$job")"
+            name="$(jq -r '.name' <<< "$job")"
             # a job's id is also its check run id
-            $titles = @(Invoke-GhApi "repos/$repo/check-runs/$($job.id)/annotations?per_page=100" '.[].title')
-            $hit = $titles | Where-Object { $markers -contains $_ } | Select-Object -First 1
-            if ($hit) { $marked += [pscustomobject]@{ name = $job.name; marker = $hit } }
+            titles="$(gh_api "repos/$repo/check-runs/$id/annotations?per_page=100" '.[].title')"
+            hit="$(printf '%s\n' "$titles" | jq -nRr --argjson markers "$markers" 'first(inputs | select(IN($markers[]))) // empty')"
+            if [ -n "$hit" ]; then
+              marked+=("\`$hit\`: $name")
             # a job that only failed because a job it needs failed carries no annotation of its own
-            elseif ($job.steps.Count -eq 0 -or -not ($job.steps | Where-Object { $_.conclusion -eq 'failure' })) { continue }
-            else { $unmarked += $job.name }
-          }
+            elif [ "$(jq -r '.steps == 0 or .failedSteps == 0' <<< "$job")" = true ]; then
+              continue
+            else
+              unmarked+=("$name")
+            fi
+          done <<< "$failed"
 
-          Write-Summary "### Retryable failures in run $($env:RUN_ID) attempt $attempt"
-          Write-Summary ''
-          foreach ($m in $marked) { Write-Summary "- ``$($m.marker)``: $($m.name)" }
-          foreach ($u in $unmarked) { Write-Summary "- not retryable: $u" }
-          Write-Summary ''
+          summary "### Retryable failures in run $RUN_ID attempt $attempt"
+          summary ''
+          for m in "${marked[@]}"; do summary "- $m"; done
+          for u in "${unmarked[@]}"; do summary "- not retryable: $u"; done
+          summary ''
 
-          if ($marked.Count -eq 0) {
-            Write-Summary 'Nothing to rerun: no failure carries a retry marker.'
+          if [ "${#marked[@]}" -eq 0 ]; then
+            summary 'Nothing to rerun: no failure carries a retry marker.'
             exit 0
-          }
-          if ($unmarked.Count -gt 0) {
+          fi
+          if [ "${#unmarked[@]}" -gt 0 ]; then
             # a rerun repeats every failed job, so a real failure would only fail again at full cost
-            Write-Summary 'Not rerun: other jobs failed for reasons a rerun does not fix.'
+            summary 'Not rerun: other jobs failed for reasons a rerun does not fix.'
             exit 0
-          }
-          if ($attempt -ge [int]$env:MAX_ATTEMPTS) {
-            Write-Summary "Not rerun: attempt $attempt reached the limit of $($env:MAX_ATTEMPTS)."
-            echo "::warning::Run $($env:RUN_ID) still has retryable failures after $attempt attempts"
+          fi
+          if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
+            summary "Not rerun: attempt $attempt reached the limit of $MAX_ATTEMPTS."
+            echo "::warning::Run $RUN_ID still has retryable failures after $attempt attempts"
             exit 0
-          }
+          fi
 
-          $delay = [int]$env:DELAY_SECONDS
-          if ($delay -gt 0) { Start-Sleep -Seconds $delay }
-          gh run rerun $env:RUN_ID --failed --repo $repo
-          Write-Summary "Reran the $($marked.Count) failed jobs as attempt $($attempt + 1)."
+          if [ "$DELAY_SECONDS" -gt 0 ]; then sleep "$DELAY_SECONDS"; fi
+          gh run rerun "$RUN_ID" --failed --repo "$repo"
+          summary "Reran the ${#marked[@]} failed jobs as attempt $((attempt + 1))."
