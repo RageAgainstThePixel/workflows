@@ -1,6 +1,11 @@
 name: configure-action-repo
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: workflows repo ref to run the configure script from
+        type: string
+        default: main
     secrets:
       token:
         description: token with admin access to the calling repository
@@ -23,6 +28,7 @@ jobs:
         if: ${{ steps.check.outputs.configured != 'true' }}
         with:
           repository: RageAgainstThePixel/workflows
+          ref: ${{ inputs.ref }}
           sparse-checkout: scripts
           persist-credentials: false
       - name: configure repository
