@@ -3,11 +3,17 @@ set -e -o pipefail
 # This script generates GitHub repositories for each Google Unity package
 # found on the Google Unity Archive page, using a predefined template repository.
 
+# DISCORD_WEBHOOK_URL: discord webhook for tag announcements, added to every package repository missing it
+ensure_discord_hook() {
+    bash ./scripts/add-discord-hook.sh "RageAgainstThePixel/${1}" create
+}
+
 packages=$(curl -sS https://developers.google.com/unity/archive | grep -oP 'com.google.[a-z.-]*\d+\.\d+\.\d+\.tgz' | sed -r 's/-?[0-9]+\.[0-9]+\.[0-9]+\.tgz//g' | sort -u)
 echo "Found ${#packages[@]} packages:"
 for package in ${packages}; do
     if gh repo view RageAgainstThePixel/"${package}" >/dev/null 2>&1; then
         echo "Repository for ${package} already exists, skipping."
+        ensure_discord_hook "${package}"
         continue
     fi
 
@@ -38,6 +44,8 @@ for package in ${packages}; do
     else
         echo "Repository settings configured successfully for ${package}."
     fi
+
+    ensure_discord_hook "${package}"
 
     echo "::group:: Triggering initial sync workflow for ${package}"
     # Poll for the workflow file to be available

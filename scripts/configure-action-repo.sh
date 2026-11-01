@@ -1,12 +1,11 @@
 #!/usr/bin/env bash
 # Applies the repository settings that org rulesets and security configurations can't inherit to a GitHub Action repository.
 # usage: configure-action-repo.sh <owner/repo> [--dry-run]
-# DISCORD_HOOK_SOURCE: existing action repo whose discord release/star hook is copied, so the url never lives in source control
+# DISCORD_WEBHOOK_URL: discord webhook for release/star announcements, from a secret so the url never lives in source control
 set -euo pipefail
 
 repo="${1:?usage: configure-action-repo.sh <owner/repo> [--dry-run]}"
 dry_run="${2:-}"
-hook_source="${DISCORD_HOOK_SOURCE:-RageAgainstThePixel/unity-action}"
 
 if [[ ! "$repo" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
   echo "invalid repository: $repo" >&2
@@ -78,21 +77,6 @@ EOF
 # org security configuration enables default setup, but only with the default query suite
 gh api -X PATCH "repos/$repo/code-scanning/default-setup" -f state=configured -f query_suite=extended --silent
 
-existing="$(gh api "repos/$repo/hooks" --jq '[.[] | select(.config.url | test("discord.com"))] | length')"
-
-if [[ "$existing" == "0" ]]; then
-  discord_url="$(gh api "repos/$hook_source/hooks" --jq '[.[] | select(.config.url | test("discord.com"))][0].config.url // empty')"
-
-  if [[ -z "$discord_url" ]]; then
-    echo "$hook_source has no discord hook to copy" >&2
-    exit 1
-  fi
-
-  gh api -X POST "repos/$repo/hooks" --silent \
-    -f name=web -F active=true \
-    -f 'events[]=release' -f 'events[]=star' \
-    -f "config[url]=$discord_url" -f 'config[content_type]=json' -f 'config[insecure_ssl]=0'
-  unset discord_url
-fi
+bash "$(dirname "$0")/add-discord-hook.sh" "$repo" release star
 
 echo "Configured $repo"

@@ -39,3 +39,4 @@ jobs:
         run: ./.github/workflows/scripts/generate-synced-google-package-repository.sh
         env:
           GH_TOKEN: ${{ secrets.CI_TOKEN }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.GOOGLE_PACKAGES_DISCORD_WEBHOOK }}

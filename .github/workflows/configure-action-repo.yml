@@ -5,6 +5,9 @@ on:
       token:
         description: token with admin access to the calling repository
         required: true
+      discord-webhook:
+        description: discord webhook url for release announcements
+        required: false
 permissions:
   contents: read
 jobs:
@@ -29,3 +32,5 @@ jobs:
       - name: configure repository
         if: ${{ steps.check.outputs.configured != 'true' }}
         run: bash scripts/configure-action-repo.sh "$REPOSITORY"
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.discord-webhook }}
