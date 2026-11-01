@@ -1,7 +1,7 @@
 name: publish-codeql-packs
 on:
   push:
-    branches: [main, codeql-trusted-owners]
+    branches: [main]
     paths:
       - codeql/actions-trusted-owners/**
       - .github/workflows/publish-codeql-packs.yml
