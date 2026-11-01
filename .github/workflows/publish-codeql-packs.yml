@@ -1,0 +1,30 @@
+name: publish-codeql-packs
+on:
+  push:
+    branches: [main, codeql-trusted-owners]
+    paths:
+      - codeql/actions-trusted-owners/**
+      - .github/workflows/publish-codeql-packs.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  packages: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: publish actions-trusted-owners
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          codeql="$(ls -d /opt/hostedtoolcache/CodeQL/*/x64/codeql | sort -V | tail -n 1)/codeql"
+          "$codeql" version --format=terse
+          version="$(sed -n 's/^version: *//p' codeql/actions-trusted-owners/qlpack.yml)"
+          if echo "$GITHUB_TOKEN" | "$codeql" pack download "rageagainstthepixel/actions-trusted-owners@$version" --github-auth-stdin --dir "$RUNNER_TEMP/packs" > /dev/null 2>&1; then
+            echo "rageagainstthepixel/actions-trusted-owners@$version is already published"
+            exit 0
+          fi
+          echo "$GITHUB_TOKEN" | "$codeql" pack publish codeql/actions-trusted-owners --github-auth-stdin --allow-dirty

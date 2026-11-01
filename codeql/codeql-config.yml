@@ -1,0 +1,5 @@
+# org-wide codeql default setup config, applied through the github-codeql-config-file repository property.
+# trusts RageAgainstThePixel and buildalon actions on floating tags; actions/unpinned-tag still flags unpinned third-party refs.
+packs:
+  actions:
+    - rageagainstthepixel/actions-trusted-owners
