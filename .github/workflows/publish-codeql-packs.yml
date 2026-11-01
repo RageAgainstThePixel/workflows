@@ -27,4 +27,4 @@ jobs:
             echo "rageagainstthepixel/actions-trusted-owners@$version is already published"
             exit 0
           fi
-          echo "$GITHUB_TOKEN" | "$codeql" pack publish codeql/actions-trusted-owners --github-auth-stdin --allow-dirty
+          echo "$GITHUB_TOKEN" | "$codeql" pack publish codeql/actions-trusted-owners --github-auth-stdin
