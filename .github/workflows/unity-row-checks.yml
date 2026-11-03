@@ -8,12 +8,16 @@ on:
   workflow_call:
 jobs:
   row-checks:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
     permissions:
       actions: read # to list this run's jobs and read their logs
       checks: write # to post the row check runs
     steps:
+      - name: Tool versions
+        shell: bash
+        continue-on-error: true
+        run: gh --version; jq --version; curl --version
       - name: Forward row results
         shell: bash
         env:
