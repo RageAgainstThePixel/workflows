@@ -92,9 +92,16 @@ jobs:
             responsibility=""
             if [ "${conclusion}" = "failure" ] || [ "${conclusion}" = "timed_out" ]; then
               steps="$(jq -r '.failed_steps | join(", ")' <<< "${r}")"
-              errors="$(gh api "repos/${repo}/check-runs/${id}/annotations?per_page=100" --jq '[.[] | select(.annotation_level == "failure") | "- " + (.message | gsub("\n"; " ") | .[:500])] | .[:20] | join("\n")' 2>/dev/null || true)"
-              # gh api refuses output with terminal escape sequences, which Unity logs are full of
-              log="$(curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" "${GITHUB_API_URL}/repos/${repo}/actions/jobs/${id}/logs" 2>/dev/null | tail -c 5000000 || true)"
+              if ! errors="$(gh api "repos/${repo}/check-runs/${id}/annotations?per_page=100" --jq '[.[] | select(.annotation_level == "failure") | "- " + (.message | gsub("\n"; " ") | .[:500])] | .[:20] | join("\n")' 2> "${RUNNER_TEMP}/err")"; then
+                echo "::warning::Could not read the annotations of job ${id} (check-runs/${id}/annotations): $(tr '\n' ' ' < "${RUNNER_TEMP}/err")"
+                errors=""
+              fi
+              # gh api refuses output with terminal escape sequences, which Unity logs are full of, so curl follows the redirect
+              if ! curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" "${GITHUB_API_URL}/repos/${repo}/actions/jobs/${id}/logs" -o "${RUNNER_TEMP}/job.log" 2> "${RUNNER_TEMP}/err"; then
+                echo "::warning::Could not read the log of job ${id} (actions/jobs/${id}/logs): $(tr '\n' ' ' < "${RUNNER_TEMP}/err")"
+                : > "${RUNNER_TEMP}/job.log"
+              fi
+              log="$(tail -c 5000000 "${RUNNER_TEMP}/job.log")"
               # the annotations go first, so a log that could not be read still has the errors to go on
               responsibility="$(blame "${steps}" "${errors}"$'\n'"${log}")"
               if [ "${alpha}" = "true" ]; then
