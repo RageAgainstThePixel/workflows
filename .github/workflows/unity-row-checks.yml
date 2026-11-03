@@ -1,14 +1,10 @@
 name: unity-row-checks
 # Forwards every Unity row of the calling run as its own check run. Mainline rows keep their real result; alpha rows
 # that fail report neutral, so they warn without gating. Each failed row's summary lists its failed steps, its error
-# annotations and a best guess at where the fix belongs. Never fails: the caller's own result job is the gate.
+# annotations and a best guess at where the fix belongs. Never fails: the caller's own result job is the gate. A row is
+# alpha when its group name carries the " (alpha)" that unity-stream-matrix adds to alpha-only streams.
 on:
   workflow_call:
-    inputs:
-      alpha-streams:
-        description: JSON array of the streams that only have alpha releases (unity-stream-matrix's alpha-streams)
-        type: string
-        default: '[]'
 jobs:
   row-checks:
     runs-on: ubuntu-latest
@@ -21,7 +17,6 @@ jobs:
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          ALPHA_STREAMS: ${{ inputs.alpha-streams }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
         run: |
           set -uo pipefail
@@ -32,13 +27,13 @@ jobs:
             exit 0
           fi
           # a row is a job of a matrix group whose name holds a Unity version, e.g. "build 6000.3 / ubuntu-latest StandaloneLinux64"
-          rows="$(jq -c --argjson alpha "${ALPHA_STREAMS:-[]}" '
+          rows="$(jq -c '
             [ .[] | select(.status == "completed" and (.name | contains(" / ")))
               | (.name | split(" / ")) as $p
               | ([$p[0] | capture("(?<v>[0-9]+\\.[0-9]+[0-9a-z.]*)") | .v][0]) as $stream
               | select($stream != null)
               | { id, conclusion, url: .html_url, stream: $stream, row: ($p[1:] | join(" / ")),
-                  alpha: ($alpha | index($stream) != null),
+                  alpha: ($p[0] | contains("(alpha)")),
                   failed_steps: [.steps[]? | select(.conclusion == "failure") | .name] } ]' <<< "${jobs}")"
           if [ "$(jq 'length' <<< "${rows}")" -eq 0 ]; then
             echo "No Unity rows in this run"

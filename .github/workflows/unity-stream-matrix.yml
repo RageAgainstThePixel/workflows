@@ -2,7 +2,9 @@ name: unity-stream-matrix
 # Builds the Unity job matrix for a caller. Pull requests and pushes test the streams the official Unity CLI lists
 # (the LTS lines, the current release, the beta and the alpha), so a stream joins when Unity lists it and leaves when
 # Unity stops. Scheduled runs, or callers passing legacy: true, test the older major.minor lines in legacy-build-options,
-# and those runs need allow-security-alert, since Unity labels most of those editors with a Security Alert.
+# and those runs need allow-security-alert, since Unity labels most of those editors with a Security Alert. A stream
+# that only has alpha releases gets " (alpha)" on its group name and "alpha": true on its rows, so a caller's row job
+# can set continue-on-error: ${{ matrix.alpha == true }} and unity-row-checks reports those rows without gating.
 on:
   workflow_call:
     inputs:
@@ -33,9 +35,6 @@ on:
       allow-security-alert:
         description: Whether the rows must install editors that carry a Unity Security Alert
         value: ${{ jobs.setup.outputs.legacy }}
-      alpha-streams:
-        description: JSON array of the streams that only have alpha releases; their rows report without gating
-        value: ${{ jobs.setup.outputs.alpha-streams }}
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -96,7 +95,24 @@ jobs:
           build-options: ${{ env.LEGACY == 'true' && inputs.legacy-build-options || steps.streams.outputs.path }}
           group-by: ${{ inputs.group-by }}
           job-name-prefix: ${{ inputs.job-name-prefix }}
+      - name: Flag alpha rows
+        id: flag-alpha
+        shell: bash
+        env:
+          JOBS: ${{ steps.setup-jobs.outputs.jobs }}
+          ALPHA: ${{ steps.streams.outputs.alpha || '[]' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${JOBS}" ]; then
+            echo "jobs=" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          # rows of an alpha-only stream may fail without failing the run; the group name tells them apart in checks
+          jobs="$(jq -c --argjson alpha "${ALPHA}" '
+            .jobs |= map(
+              .matrix.include |= map(if (."unity-version" as $v | $alpha | index($v)) != null then .alpha = true else . end)
+              | if any(.matrix.include[]; .alpha == true) then .name += " (alpha)" else . end)' <<< "${JOBS}")"
+          echo "jobs=${jobs}" >> "${GITHUB_OUTPUT}"
     outputs:
-      jobs: ${{ steps.setup-jobs.outputs.jobs }}
+      jobs: ${{ steps.flag-alpha.outputs.jobs }}
       legacy: ${{ env.LEGACY }}
-      alpha-streams: ${{ steps.streams.outputs.alpha || '[]' }}
