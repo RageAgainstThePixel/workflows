@@ -93,7 +93,8 @@ jobs:
             if [ "${conclusion}" = "failure" ] || [ "${conclusion}" = "timed_out" ]; then
               steps="$(jq -r '.failed_steps | join(", ")' <<< "${r}")"
               errors="$(gh api "repos/${repo}/check-runs/${id}/annotations?per_page=100" --jq '[.[] | select(.annotation_level == "failure") | "- " + (.message | gsub("\n"; " ") | .[:500])] | .[:20] | join("\n")' 2>/dev/null || true)"
-              log="$(gh api "repos/${repo}/actions/jobs/${id}/logs" 2>/dev/null | tail -c 5000000 || true)"
+              # gh api refuses output with terminal escape sequences, which Unity logs are full of
+              log="$(curl -fsSL -H "Authorization: Bearer ${GH_TOKEN}" "${GITHUB_API_URL}/repos/${repo}/actions/jobs/${id}/logs" 2>/dev/null | tail -c 5000000 || true)"
               responsibility="$(blame "${steps}" "${log}")"
               if [ "${alpha}" = "true" ]; then
                 also="$(jq -r --arg row "${row}" '[.[] | select(.row == $row) | .stream] | join(", ")' <<< "${mainline_failed}")"
