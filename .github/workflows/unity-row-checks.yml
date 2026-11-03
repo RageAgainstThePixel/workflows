@@ -1,0 +1,125 @@
+name: unity-row-checks
+# Forwards every Unity row of the calling run as its own check run. Mainline rows keep their real result; alpha rows
+# that fail report neutral, so they warn without gating. Each failed row's summary lists its failed steps, its error
+# annotations and a best guess at where the fix belongs. Never fails: the caller's own result job is the gate.
+on:
+  workflow_call:
+    inputs:
+      alpha-streams:
+        description: JSON array of the streams that only have alpha releases (unity-stream-matrix's alpha-streams)
+        type: string
+        default: '[]'
+jobs:
+  row-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      actions: read # to list this run's jobs and read their logs
+      checks: write # to post the row check runs
+    steps:
+      - name: Forward row results
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ALPHA_STREAMS: ${{ inputs.alpha-streams }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -uo pipefail
+          repo="${GITHUB_REPOSITORY}"
+          own="${GITHUB_REPOSITORY#*/}"
+          if ! jobs="$(gh api "repos/${repo}/actions/runs/${GITHUB_RUN_ID}/jobs?filter=latest&per_page=100" --paginate --jq '.jobs[]' | jq -s '.')"; then
+            echo "::warning::Could not list this run's jobs, so no row checks were posted"
+            exit 0
+          fi
+          # a row is a job of a matrix group whose name holds a Unity version, e.g. "build 6000.3 / ubuntu-latest StandaloneLinux64"
+          rows="$(jq -c --argjson alpha "${ALPHA_STREAMS:-[]}" '
+            [ .[] | select(.status == "completed" and (.name | contains(" / ")))
+              | (.name | split(" / ")) as $p
+              | ([$p[0] | capture("(?<v>[0-9]+\\.[0-9]+[0-9a-z.]*)") | .v][0]) as $stream
+              | select($stream != null)
+              | { id, conclusion, url: .html_url, stream: $stream, row: ($p[1:] | join(" / ")),
+                  alpha: ($alpha | index($stream) != null),
+                  failed_steps: [.steps[]? | select(.conclusion == "failure") | .name] } ]' <<< "${jobs}")"
+          if [ "$(jq 'length' <<< "${rows}")" -eq 0 ]; then
+            echo "No Unity rows in this run"
+            exit 0
+          fi
+          # rows that also fail on a mainline stream point at our code, not at the alpha
+          mainline_failed="$(jq -c '[.[] | select((.alpha | not) and (.conclusion == "failure" or .conclusion == "timed_out")) | {row, stream}]' <<< "${rows}")"
+
+          blame() { # $1 failed step names, $2 job log
+            local steps="$1" log="$2" pkgs
+            if grep -Eq 'Segmentation fault|signal 11|exit code 139|Native Crash Reporting|Crash!!!|Obtained [0-9]+ stack frames' <<< "${log}"; then
+              echo "Unity: the editor crashed. Attach the Editor.log from the row artifacts to a Unity bug report"
+            elif grep -Eiq 'unity-setup|install' <<< "${steps}"; then
+              echo "Unity: the editor or module install failed (release or download service), unless this repo is unity-setup or unity-cli"
+            elif grep -Eiq 'licen[cs]e' <<< "${steps}" || grep -Eq 'unity-license-exhausted|No valid Unity Editor license' <<< "${log}"; then
+              echo "Licensing: the Unity license service or our seat handling, not the code under test"
+            elif pkgs="$(grep -E 'error CS[0-9]+' <<< "${log}" | grep -Eo '(Library/PackageCache|Packages)/[A-Za-z0-9._-]+' | sed -E 's#^(Library/PackageCache|Packages)/##; s#@.*##' | sort -u | grep -vx "${own}" | head -5 | paste -sd, -)" && [ -n "${pkgs}" ]; then
+              case "${pkgs}" in
+                com.unity.*) echo "Unity: compile errors in ${pkgs}. Look for a package version that supports this stream" ;;
+                *) echo "Package maintainers: compile errors in ${pkgs} (ours if it is one of our packages)" ;;
+              esac
+            elif grep -Eq 'error CS0619|error CS0618' <<< "${log}"; then
+              echo "Ours: our code uses an API this stream removed. Add a version guard before the stream ships"
+            elif grep -Eq 'error CS[0-9]+' <<< "${log}"; then
+              echo "Ours: compile errors in this repo's code"
+            elif grep -Eiq 'test' <<< "${steps}"; then
+              echo "Likely ours: tests failed. Upstream only if the same tests pass on every mainline stream"
+            else
+              echo "Unclear: compare with the same row on the newest mainline stream"
+            fi
+          }
+
+          {
+            echo "## Unity rows"
+            echo
+            echo "| Stream | Row | Result | Where the fix belongs |"
+            echo "|---|---|---|---|"
+          } >> "${GITHUB_STEP_SUMMARY}"
+          details=""
+          post_warned=false
+          while IFS= read -r r; do
+            id="$(jq -r '.id' <<< "${r}")"
+            stream="$(jq -r '.stream' <<< "${r}")"
+            row="$(jq -r '.row' <<< "${r}")"
+            url="$(jq -r '.url' <<< "${r}")"
+            conclusion="$(jq -r '.conclusion' <<< "${r}")"
+            alpha="$(jq -r '.alpha' <<< "${r}")"
+            check="${conclusion}"
+            title="${conclusion}"
+            body="[Job log](${url})"
+            responsibility=""
+            if [ "${conclusion}" = "failure" ] || [ "${conclusion}" = "timed_out" ]; then
+              steps="$(jq -r '.failed_steps | join(", ")' <<< "${r}")"
+              errors="$(gh api "repos/${repo}/check-runs/${id}/annotations?per_page=100" --jq '[.[] | select(.annotation_level == "failure") | "- " + (.message | gsub("\n"; " ") | .[:500])] | .[:20] | join("\n")' 2>/dev/null || true)"
+              log="$(gh api "repos/${repo}/actions/jobs/${id}/logs" 2>/dev/null | tail -c 5000000 || true)"
+              responsibility="$(blame "${steps}" "${log}")"
+              if [ "${alpha}" = "true" ]; then
+                also="$(jq -r --arg row "${row}" '[.[] | select(.row == $row) | .stream] | join(", ")' <<< "${mainline_failed}")"
+                if [ -n "${also}" ]; then
+                  responsibility="Ours: the same row also fails on ${also}"
+                fi
+                check="neutral"
+                title="alpha ${stream} failed (not gating)"
+              fi
+              body="$(printf '%s\n\n**Where the fix belongs:** %s\n\n**Failed steps:** %s\n\n**Errors:**\n%s' "${body}" "${responsibility}" "${steps:-none recorded}" "${errors:-- none annotated; see the job log}")"
+              details+="$(printf '\n### %s / %s\n\n%s\n' "${stream}" "${row}" "${body}")"
+            elif [ "${alpha}" = "true" ] && [ "${conclusion}" = "cancelled" ]; then
+              check="neutral"
+            fi
+            echo "| ${stream}$([ "${alpha}" = "true" ] && echo ' (alpha)') | ${row} | ${check} | ${responsibility} |" >> "${GITHUB_STEP_SUMMARY}"
+            if ! jq -n --arg name "unity ${stream} / ${row}" --arg sha "${HEAD_SHA}" --arg c "${check}" --arg t "${title}" --arg s "${body}" --arg url "${url}" \
+                '{name: $name, head_sha: $sha, status: "completed", conclusion: $c, details_url: $url, output: {title: $t, summary: ($s | .[:65000])}}' |
+                gh api -X POST "repos/${repo}/check-runs" --input - > /dev/null; then
+              # pull requests from forks get a read-only token; the step summary still has every row
+              if [ "${post_warned}" = false ]; then
+                echo "::warning::Could not post row check runs; see this job's summary"
+                post_warned=true
+              fi
+            fi
+          done < <(jq -c '.[]' <<< "${rows}")
+          if [ -n "${details}" ]; then
+            printf '\n## Failed rows\n%s\n' "${details}" >> "${GITHUB_STEP_SUMMARY}"
+          fi
+          exit 0

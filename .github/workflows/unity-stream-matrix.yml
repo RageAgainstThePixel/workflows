@@ -33,6 +33,9 @@ on:
       allow-security-alert:
         description: Whether the rows must install editors that carry a Unity Security Alert
         value: ${{ jobs.setup.outputs.legacy }}
+      alpha-streams:
+        description: JSON array of the streams that only have alpha releases; their rows report without gating
+        value: ${{ jobs.setup.outputs.alpha-streams }}
 jobs:
   setup:
     runs-on: ubuntu-latest
@@ -63,22 +66,28 @@ jobs:
           generated="${RUNNER_TEMP}/build-options.json"
           prefix="${RUNNER_TEMP}/unity-cli"
           # errexit does not apply inside a function called as a condition, so every step returns on failure itself
-          list_streams() {
+          list_versions() {
             npm install --prefix "${prefix}" --no-save --no-audit --no-fund '@rage-against-the-pixel/unity-cli@4' > /dev/null || return 1
             # unity-cli installs the official CLI with SHA-256 verification; no license is needed to list releases
             local cli
             cli="$(node -e "require(process.argv[1]).UnityCli.Get().then(c => console.log(c.executable), e => { console.error(e); process.exit(1); })" "${prefix}/node_modules/@rage-against-the-pixel/unity-cli" | tail -n 1)" || return 1
             [ -n "${cli}" ] || return 1
             "${cli}" editors --releases --format json |
-              jq -c '[.data.items[].version | select(test("^[0-9]+\\.[0-9]+\\.")) | capture("^(?<s>[0-9]+\\.[0-9]+)").s] | unique_by(split(".") | map(tonumber))'
+              jq -c '[.data.items[].version | select(test("^[0-9]+\\.[0-9]+\\."))]'
           }
-          if streams="$(list_streams)" && [ "$(jq 'length' <<< "${streams}")" -gt 0 ]; then
+          alpha='[]'
+          if versions="$(list_versions)" && [ "$(jq 'length' <<< "${versions}")" -gt 0 ]; then
+            streams="$(jq -c 'map(capture("^(?<s>[0-9]+\\.[0-9]+)").s) | unique_by(split(".") | map(tonumber))' <<< "${versions}")"
+            # a stream is alpha while every release Unity lists for it is an alpha; its first beta makes it gate again
+            alpha="$(jq -c 'group_by(capture("^(?<s>[0-9]+\\.[0-9]+)").s) | map(select(all(.[]; test("a[0-9]+$"))) | .[0] | capture("^(?<s>[0-9]+\\.[0-9]+)").s)' <<< "${versions}")"
             jq --argjson streams "${streams}" '."unity-version" = $streams' "${OPTIONS}" > "${generated}"
           else
             # a failed listing falls back to the file's own list rather than failing the step
             echo "::warning::Could not list Unity releases, testing the fallback streams"
             cp "${OPTIONS}" "${generated}"
           fi
+          echo "Alpha streams (report without gating): $(jq -r 'join(", ")' <<< "${alpha}")"
+          echo "alpha=${alpha}" >> "${GITHUB_OUTPUT}"
           echo "Testing Unity streams: $(jq -r '."unity-version" | join(", ")' "${generated}")"
           echo "path=${generated}" >> "${GITHUB_OUTPUT}"
       - uses: RageAgainstThePixel/job-builder@v1
@@ -90,3 +99,4 @@ jobs:
     outputs:
       jobs: ${{ steps.setup-jobs.outputs.jobs }}
       legacy: ${{ env.LEGACY }}
+      alpha-streams: ${{ steps.streams.outputs.alpha || '[]' }}

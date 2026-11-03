@@ -9,6 +9,10 @@ on:
         description: Install editors that carry a Unity Security Alert, which the monthly legacy run needs
         type: boolean
         default: false
+      alpha-streams:
+        description: JSON array of alpha streams; their rows report without gating
+        type: string
+        default: '[]'
     secrets:
       UNITY_USERNAME:
         required: true
@@ -20,6 +24,7 @@ jobs:
     strategy:
       matrix: ${{ fromJSON(inputs.matrix) }}
       fail-fast: false
+    continue-on-error: ${{ contains(fromJSON(inputs.alpha-streams), matrix.unity-version) }}
     runs-on: ${{ matrix.os }}
     permissions:
       contents: read
