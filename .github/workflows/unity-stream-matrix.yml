@@ -3,8 +3,9 @@ name: unity-stream-matrix
 # (the LTS lines, the current release, the beta and the alpha), so a stream joins when Unity lists it and leaves when
 # Unity stops. Scheduled runs, or callers passing legacy: true, test the older major.minor lines in legacy-build-options,
 # and those runs need allow-security-alert, since Unity labels most of those editors with a Security Alert. A stream
-# that only has alpha releases gets " (alpha)" on its group name and "alpha": true on its rows, so a caller's row job
-# can set continue-on-error: ${{ matrix.alpha == true }} and unity-row-checks reports those rows without gating.
+# with no final (f) release yet is a prerelease: its group name gets " (alpha)" or " (beta)" and its rows get
+# "prerelease": true, so a caller's row job sets continue-on-error from matrix.prerelease and unity-row-checks reports
+# those rows without gating. The stream gates from its first final release.
 on:
   workflow_call:
     inputs:
@@ -74,19 +75,22 @@ jobs:
             "${cli}" editors --releases --format json |
               jq -c '[.data.items[].version | select(test("^[0-9]+\\.[0-9]+\\."))]'
           }
-          alpha='[]'
+          prerelease='{}'
           if versions="$(list_versions)" && [ "$(jq 'length' <<< "${versions}")" -gt 0 ]; then
             streams="$(jq -c 'map(capture("^(?<s>[0-9]+\\.[0-9]+)").s) | unique_by(split(".") | map(tonumber))' <<< "${versions}")"
-            # a stream is alpha while every release Unity lists for it is an alpha; its first beta makes it gate again
-            alpha="$(jq -c 'group_by(capture("^(?<s>[0-9]+\\.[0-9]+)").s) | map(select(all(.[]; test("a[0-9]+$"))) | .[0] | capture("^(?<s>[0-9]+\\.[0-9]+)").s)' <<< "${versions}")"
+            # a stream is a prerelease while every release Unity lists for it is an alpha or a beta, keyed to its kind
+            prerelease="$(jq -c 'group_by(capture("^(?<s>[0-9]+\\.[0-9]+)").s)
+              | map(select(all(.[]; test("[ab][0-9]+$")))
+                | {key: (.[0] | capture("^(?<s>[0-9]+\\.[0-9]+)").s), value: (if any(.[]; test("b[0-9]+$")) then "beta" else "alpha" end)})
+              | from_entries' <<< "${versions}")"
             jq --argjson streams "${streams}" '."unity-version" = $streams' "${OPTIONS}" > "${generated}"
           else
             # a failed listing falls back to the file's own list rather than failing the step
             echo "::warning::Could not list Unity releases, testing the fallback streams"
             cp "${OPTIONS}" "${generated}"
           fi
-          echo "Alpha streams (report without gating): $(jq -r 'join(", ")' <<< "${alpha}")"
-          echo "alpha=${alpha}" >> "${GITHUB_OUTPUT}"
+          echo "Prerelease streams (report without gating): $(jq -r 'to_entries | map("\(.key) (\(.value))") | join(", ")' <<< "${prerelease}")"
+          echo "prerelease=${prerelease}" >> "${GITHUB_OUTPUT}"
           echo "Testing Unity streams: $(jq -r '."unity-version" | join(", ")' "${generated}")"
           echo "path=${generated}" >> "${GITHUB_OUTPUT}"
       - uses: RageAgainstThePixel/job-builder@v1
@@ -95,24 +99,24 @@ jobs:
           build-options: ${{ env.LEGACY == 'true' && inputs.legacy-build-options || steps.streams.outputs.path }}
           group-by: ${{ inputs.group-by }}
           job-name-prefix: ${{ inputs.job-name-prefix }}
-      - name: Flag alpha rows
-        id: flag-alpha
+      - name: Flag prerelease rows
+        id: flag-prerelease
         shell: bash
         env:
           JOBS: ${{ steps.setup-jobs.outputs.jobs }}
-          ALPHA: ${{ steps.streams.outputs.alpha || '[]' }}
+          PRERELEASE: ${{ steps.streams.outputs.prerelease || '{}' }}
         run: |
           set -euo pipefail
           if [ -z "${JOBS}" ]; then
             echo "jobs=" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
-          # rows of an alpha-only stream may fail without failing the run; the group name tells them apart in checks
-          jobs="$(jq -c --argjson alpha "${ALPHA}" '
+          # rows of a prerelease stream may fail without failing the run; the group name tells them apart in checks
+          jobs="$(jq -c --argjson pre "${PRERELEASE}" '
             .jobs |= map(
-              .matrix.include |= map(if (."unity-version" as $v | $alpha | index($v)) != null then .alpha = true else . end)
-              | if any(.matrix.include[]; .alpha == true) then .name += " (alpha)" else . end)' <<< "${JOBS}")"
+              ([.matrix.include[] | $pre[."unity-version" // ""] // empty] | first) as $kind
+              | if $kind then .name += " (\($kind))" | .matrix.include |= map(if $pre[."unity-version" // ""] then .prerelease = true else . end) else . end)' <<< "${JOBS}")"
           echo "jobs=${jobs}" >> "${GITHUB_OUTPUT}"
     outputs:
-      jobs: ${{ steps.flag-alpha.outputs.jobs }}
+      jobs: ${{ steps.flag-prerelease.outputs.jobs }}
       legacy: ${{ env.LEGACY }}

@@ -1,8 +1,9 @@
 name: unity-row-checks
-# Forwards every Unity row of the calling run as its own check run. Mainline rows keep their real result; alpha rows
-# that fail report neutral, so they warn without gating. Each failed row's summary lists its failed steps, its error
+# Forwards every Unity row of the calling run as its own check run. Mainline rows keep their real result; prerelease
+# rows that fail report neutral, so they warn without gating. Each failed row's summary lists its failed steps, its error
 # annotations and a best guess at where the fix belongs. Never fails: the caller's own result job is the gate. A row is
-# alpha when its group name carries the " (alpha)" that unity-stream-matrix adds to alpha-only streams.
+# a prerelease when its group name carries the " (alpha)" or " (beta)" that unity-stream-matrix adds to streams with no
+# final release yet.
 on:
   workflow_call:
 jobs:
@@ -33,14 +34,14 @@ jobs:
               | ([$p[0] | capture("(?<v>[0-9]+\\.[0-9]+[0-9a-z.]*)") | .v][0]) as $stream
               | select($stream != null)
               | { id, conclusion, url: .html_url, stream: $stream, row: ($p[1:] | join(" / ")),
-                  alpha: ($p[0] | contains("(alpha)")),
+                  kind: ([$p[0] | capture("\\((?<k>alpha|beta)\\)") | .k][0] // ""),
                   failed_steps: [.steps[]? | select(.conclusion == "failure") | .name] } ]' <<< "${jobs}")"
           if [ "$(jq 'length' <<< "${rows}")" -eq 0 ]; then
             echo "No Unity rows in this run"
             exit 0
           fi
-          # rows that also fail on a mainline stream point at our code, not at the alpha
-          mainline_failed="$(jq -c '[.[] | select((.alpha | not) and (.conclusion == "failure" or .conclusion == "timed_out")) | {row, stream}]' <<< "${rows}")"
+          # rows that also fail on a mainline stream point at our code, not at the prerelease
+          mainline_failed="$(jq -c '[.[] | select(.kind == "" and (.conclusion == "failure" or .conclusion == "timed_out")) | {row, stream}]' <<< "${rows}")"
 
           blame() { # $1 failed step names, $2 error annotations and job log
             local steps="$1" log="$2" pkgs
@@ -80,7 +81,7 @@ jobs:
             row="$(jq -r '.row' <<< "${r}")"
             url="$(jq -r '.url' <<< "${r}")"
             conclusion="$(jq -r '.conclusion' <<< "${r}")"
-            alpha="$(jq -r '.alpha' <<< "${r}")"
+            kind="$(jq -r '.kind' <<< "${r}")"
             check="${conclusion}"
             title="${conclusion}"
             body="[Job log](${url})"
@@ -99,20 +100,20 @@ jobs:
               log="$(tail -c 5000000 "${RUNNER_TEMP}/job.log")"
               # the annotations go first, so a log that could not be read still has the errors to go on
               responsibility="$(blame "${steps}" "${errors}"$'\n'"${log}")"
-              if [ "${alpha}" = "true" ]; then
+              if [ -n "${kind}" ]; then
                 also="$(jq -r --arg row "${row}" '[.[] | select(.row == $row) | .stream] | join(", ")' <<< "${mainline_failed}")"
                 if [ -n "${also}" ]; then
                   responsibility="Ours: the same row also fails on ${also}"
                 fi
                 check="neutral"
-                title="alpha ${stream} failed (not gating)"
+                title="${kind} ${stream} failed (not gating)"
               fi
               body="$(printf '%s\n\n**Where the fix belongs:** %s\n\n**Failed steps:** %s\n\n**Errors:**\n%s' "${body}" "${responsibility}" "${steps:-none recorded}" "${errors:-- none annotated; see the job log}")"
               details+="$(printf '\n### %s / %s\n\n%s\n' "${stream}" "${row}" "${body}")"
-            elif [ "${alpha}" = "true" ] && [ "${conclusion}" = "cancelled" ]; then
+            elif [ -n "${kind}" ] && [ "${conclusion}" = "cancelled" ]; then
               check="neutral"
             fi
-            echo "| ${stream}$([ "${alpha}" = "true" ] && echo ' (alpha)') | ${row} | ${check} | ${responsibility} |" >> "${GITHUB_STEP_SUMMARY}"
+            echo "| ${stream}$([ -n "${kind}" ] && echo " (${kind})") | ${row} | ${check} | ${responsibility} |" >> "${GITHUB_STEP_SUMMARY}"
             if ! jq -n --arg name "unity ${stream} / ${row}" --arg sha "${HEAD_SHA}" --arg c "${check}" --arg t "${title}" --arg s "${body}" --arg url "${url}" \
                 '{name: $name, head_sha: $sha, status: "completed", conclusion: $c, details_url: $url, output: {title: $t, summary: ($s | .[:65000])}}' |
                 gh api -X POST "repos/${repo}/check-runs" --input - > /dev/null; then
