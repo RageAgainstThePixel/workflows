@@ -55,7 +55,7 @@ jobs:
               echo "Unity: the editor or module install failed (release or download service), unless this repo is unity-setup or unity-cli"
             elif grep -Eiq 'licen[cs]e' <<< "${steps}" || grep -Eq 'unity-license-exhausted|No valid Unity Editor license' <<< "${log}"; then
               echo "Licensing: the Unity license service or our seat handling, not the code under test"
-            elif pkgs="$(grep -E 'error CS[0-9]+' <<< "${log}" | grep -Eo '(Library/PackageCache|Packages)/[A-Za-z0-9._-]+' | sed -E 's#^(Library/PackageCache|Packages)/##; s#@.*##' | sort -u | grep -vx "${own}" | head -5 | paste -sd, -)" && [ -n "${pkgs}" ]; then
+            elif pkgs="$(grep -E 'error CS[0-9]+' <<< "${log}" | grep -Eo '(Library[/\\]PackageCache|Packages)[/\\][A-Za-z0-9._-]+' | sed -E 's#^(Library[/\\]PackageCache|Packages)[/\\]##; s#@.*##' | sort -u | grep -vx "${own}" | head -5 | paste -sd, -)" && [ -n "${pkgs}" ]; then
               case "${pkgs}" in
                 com.unity.*) echo "Unity: compile errors in ${pkgs}. Look for a package version that supports this stream" ;;
                 *) echo "Package maintainers: compile errors in ${pkgs} (ours if it is one of our packages)" ;;
@@ -107,7 +107,11 @@ jobs:
               if [ -n "${kind}" ]; then
                 also="$(jq -r --arg row "${row}" '[.[] | select(.row == $row) | .stream] | join(", ")' <<< "${mainline_failed}")"
                 if [ -n "${also}" ]; then
-                  responsibility="Ours: the same row also fails on ${also}"
+                  # a cause the row's own errors already place elsewhere stands, whatever failed on the mainline row
+                  case "${responsibility}" in
+                    Unity:*|"Package maintainers"*|Licensing:*) ;;
+                    *) responsibility="Ours: the same row also fails on ${also}" ;;
+                  esac
                 fi
                 check="neutral"
                 title="${kind} ${stream} failed (not gating)"
