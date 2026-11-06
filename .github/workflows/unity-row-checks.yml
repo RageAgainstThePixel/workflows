@@ -31,11 +31,12 @@ jobs:
             echo "::warning::Could not list this run's jobs, so no row checks were posted"
             exit 0
           fi
-          # a row is a job of a matrix group whose name holds a Unity version, e.g. "build 6000.3 / ubuntu-latest StandaloneLinux64"
+          # a row is a job of a matrix group whose name holds a Unity version as its own word, e.g. "build 6000.3 / ubuntu-latest StandaloneLinux64"
+          # or a legacy selector, e.g. "build 2019", "Install 2019.x", "Install 2022.3.*"
           rows="$(jq -c '
             [ .[] | select(.status == "completed" and (.name | contains(" / ")))
               | (.name | split(" / ")) as $p
-              | ([$p[0] | capture("(?<v>[0-9]+\\.[0-9]+[0-9a-z.]*)") | .v][0]) as $stream
+              | ([$p[0] | capture("(?:^| )(?<v>[0-9]+\\.[0-9a-z.*]+|[0-9]{4})(?: |$)") | .v][0]) as $stream
               | select($stream != null)
               | { id, conclusion, url: .html_url, stream: $stream, row: ($p[1:] | join(" / ")),
                   kind: ([$p[0] | capture("\\((?<k>alpha|beta)\\)") | .k][0] // ""),
