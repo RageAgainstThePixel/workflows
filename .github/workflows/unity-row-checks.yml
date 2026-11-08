@@ -52,8 +52,8 @@ jobs:
             local steps="$1" log="$2" pkgs
             if grep -Eq 'Segmentation fault|signal 11|exit code 139|Native Crash Reporting|Crash!!!|Obtained [0-9]+ stack frames' <<< "${log}"; then
               echo "Unity: the editor crashed. Attach the Editor.log from the row artifacts to a Unity bug report"
-            elif grep -Eiq 'unity-setup|install' <<< "${steps}"; then
-              echo "Unity: the editor or module install failed (release or download service), unless this repo is unity-setup or unity-cli"
+            elif grep -Eiq 'unity-setup|setup unity|install' <<< "${steps}"; then
+              echo "Unity: the editor or module install failed or timed out (release or download service), unless this repo is unity-setup or unity-cli"
             elif grep -Eiq 'licen[cs]e' <<< "${steps}" || grep -Eq 'unity-license-exhausted|No valid Unity Editor license' <<< "${log}"; then
               echo "Licensing: the Unity license service or our seat handling, not the code under test"
             elif pkgs="$(grep -E 'error CS[0-9]+' <<< "${log}" | grep -Eo '(Library[/\\]PackageCache|Packages)[/\\][A-Za-z0-9._-]+' | sed -E 's#^(Library[/\\]PackageCache|Packages)[/\\]##; s#@.*##' | sort -u | grep -vx "${own}" | head -5 | paste -sd, -)" && [ -n "${pkgs}" ]; then
