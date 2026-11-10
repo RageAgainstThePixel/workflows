@@ -111,9 +111,12 @@ jobs:
             echo "jobs=" >> "${GITHUB_OUTPUT}"
             exit 0
           fi
+          # a version the build options exclude as a whole (a stream the caller does not support yet) leaves a group with
+          # no rows, and a matrix with no rows fails the whole run, so those groups are dropped.
           # rows of a prerelease stream may fail without failing the run; the group name tells them apart in checks
           jobs="$(jq -c --argjson pre "${PRERELEASE}" '
-            .jobs |= map(
+            .jobs |= map(select(((.matrix.include // []) | length) > 0))
+            | .jobs |= map(
               ([.matrix.include[] | $pre[."unity-version" // ""] // empty] | first) as $kind
               | if $kind then .name += " (\($kind))" | .matrix.include |= map(if $pre[."unity-version" // ""] then .prerelease = true else . end) else . end)' <<< "${JOBS}")"
           echo "jobs=${jobs}" >> "${GITHUB_OUTPUT}"
