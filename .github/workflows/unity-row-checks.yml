@@ -27,8 +27,17 @@ jobs:
           set -uo pipefail
           repo="${GITHUB_REPOSITORY}"
           own="${GITHUB_REPOSITORY#*/}"
-          if ! jobs="$(gh api "repos/${repo}/actions/runs/${GITHUB_RUN_ID}/jobs?filter=latest&per_page=100" --paginate --jq '.jobs[]' | jq -s '.')"; then
-            echo "::warning::Could not list this run's jobs, so no row checks were posted"
+          # the jobs API answers 502 for some large runs at 100 per page, so this lists 50 at a time and retries
+          jobs=""
+          for attempt in 1 2 3; do
+            if jobs="$(gh api "repos/${repo}/actions/runs/${GITHUB_RUN_ID}/jobs?filter=latest&per_page=50" --paginate --jq '.jobs[]' | jq -s '.')"; then
+              break
+            fi
+            jobs=""
+            sleep $((attempt * 10))
+          done
+          if [ -z "${jobs}" ]; then
+            echo "::warning::Could not list this run's jobs after 3 attempts, so no row checks were posted"
             exit 0
           fi
           # a row is a job of a matrix group whose name holds a Unity version as its own word, e.g. "build 6000.3 / ubuntu-latest StandaloneLinux64"
