@@ -119,7 +119,6 @@ jobs:
             | .jobs |= map(
               ([.matrix.include[] | $pre[."unity-version" // ""] // empty] | first) as $kind
               | if $kind then .name += " (\($kind))" | .matrix.include |= map(if $pre[."unity-version" // ""] then .prerelease = true else . end) else . end)' <<< "${JOBS}")"
-          echo "Unity groups: $(jq -r '.jobs | map("\(.name) (\(.matrix.include | length) rows)") | join(", ")' <<< "${jobs}")"
           echo "jobs=${jobs}" >> "${GITHUB_OUTPUT}"
     outputs:
       jobs: ${{ steps.flag-prerelease.outputs.jobs }}
